@@ -2,6 +2,7 @@ import datetime
 import os
 import pickle
 import time
+import re
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -12,16 +13,19 @@ from openpyxl.worksheet.hyperlink import Hyperlink
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
 
 pages = 5
 hcaptcha = True
 siteURL = "https://www.higheredjobs.com/admin/search.cfm?JobCat=242&CatName=Computer%20and%20Information%20Technology"
 cookieFile = "./cookies.pkl"
-
+jobPage = []
+salaries = []
 
 def getPageURLS():
     arrURLS = [siteURL]
@@ -62,7 +66,7 @@ def findCookies(driver, cookieFile):
 
 def saveCookies(driver):
     try:
-        
+
         WebDriverWait(driver, 60).until(
             EC.visibility_of_element_located((By.XPATH, '//*[@id="js-results"]'))
         )
@@ -86,6 +90,7 @@ def checkCookies(driver):
             element = driver.find_element(By.XPATH, '//*[@id="main-iframe"]')
             hcaptcha_url = element.get_attribute("src")
             print("hCaptcha URL:", hcaptcha_url)
+            driver.delete_all_cookies()
             deleteCookies()
             driver.refresh()
             time.sleep(20)
@@ -127,14 +132,14 @@ def scrape():
                 job_link = job_div.find("a")["href"]
                 job_title = job_div.find("a").get_text(strip=True)
 
-                # Extract company name and location
-                company_info = (
+                # Extract university name and location
+                university_info = (
                     job_div.find("div", class_="col-sm-7")
                     .get_text(separator="\n", strip=True)
                     .split("\n")
                 )
-                company_name = company_info[1]  # Company name
-                location = company_info[2]  # Location
+                university_name = university_info[1]  # university name
+                location = university_info[2]  # Location
 
                 # Extract job type and posted date
                 job_type_info = (
@@ -150,12 +155,15 @@ def scrape():
                 salary = (
                     salary_span.get_text(strip=True) if salary_span else "Not listed"
                 )
+                salaries.append(salary)
+               
 
                 job_data.append(
                     {
+
                         "Job Link": job_link,
                         "Title": job_title,
-                        "Company": company_name,
+                        "University": university_name,
                         "Location": location,
                         "Job Type": job_type,
                         "Posted Date": posted_date,
@@ -167,7 +175,7 @@ def scrape():
                 df.rename(
                     columns={
                         "Title": "Title",
-                        "Company": "Company",
+                        "University": "University",
                         "Location": "Location",
                         "Job Type": "Job Type",
                         "Posted Date": "Posted Date",
@@ -179,7 +187,7 @@ def scrape():
                 ws.append(
                     [
                         "Job Title",
-                        "Company",
+                        "University",
                         "Location",
                         "Type",
                         "Date Posted",
@@ -200,7 +208,7 @@ def scrape():
 
                 # Set font color to blue and underline the hyperlink
                 cell.font = Font(color="0000FF", underline="single")
-                ws.cell(row=index + 2, column=2, value=row["Company"])
+                ws.cell(row=index + 2, column=2, value=row["University"])
                 ws.cell(row=index + 2, column=3, value=row["Location"])
                 ws.cell(row=index + 2, column=4, value=row["Job Type"])
                 ws.cell(row=index + 2, column=5, value=row["Posted Date"])
@@ -217,6 +225,10 @@ def scrape():
         finally:
             print("done")
     wb.save(wbName)
+    print(salaries)
+    #for i in range(len(job_data)):
+     #   print(job_data[i]["Job Link"])
+    # cprint(job_data)
 
 
 scrape()
